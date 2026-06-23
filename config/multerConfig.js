@@ -14,10 +14,21 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
     const allowedTypes = /pdf|doc|docx|jpg|jpeg|png/
     const ext = allowedTypes.test(path.extname(file.originalname).toLowerCase())
-    if (ext) {
+    
+    const allowedMimeTypes = [
+        'application/pdf',                                                         // .pdf
+        'application/msword',                                                      // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+        'image/jpeg',                                                              // .jpeg / .jpg
+        'image/png'                                                                // .png
+    ]
+    const mimeValid = allowedMimeTypes.includes(file.mimetype)
+
+    // FIXED: Both extension AND binary content format must validate true
+    if (ext && mimeValid) {
         cb(null, true)
     } else {
-        cb(new Error('Only PDF, DOC, DOCX files are allowed'))
+        cb(new Error('Security Validation Failed: File extension or type is invalid!'), false)
     }
 }
 
