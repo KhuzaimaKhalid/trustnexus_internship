@@ -27,7 +27,16 @@ const register = async (req, res) => {
             [name, email, hashedPassword, 'candidate']
         )
 
-        const token = jwt.sign({ userID: newUser.rows[0].user_id }, process.env.JWT_SECRET, { expiresIn: '1d' })
+        const token = jwt.sign(
+            { 
+                claims: {
+                    user_id: newUser.rows[0].user_id,
+                    role: 'candidate'
+                }
+            }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '1d' }
+        )
         res.status(201).json({ "status": "success", "message": "Registration Success", "token": token })
 
     } catch (error) {
@@ -55,7 +64,16 @@ const login = async (req, res) => {
             return res.status(400).json({ "status": "failed", "message": "Email or password is not valid" })
         }
 
-        const token = jwt.sign({ userID: user.user_id }, process.env.JWT_SECRET, { expiresIn: '1d' })
+        const token = jwt.sign(
+            { 
+                claims: {
+                    user_id: user.user_id,
+                    role: user.role
+                }
+            }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '1d' }
+        )
         res.status(200).json({ "status": "success", "message": "Login successful", "token": token })
 
     } catch (error) {
