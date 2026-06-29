@@ -1,31 +1,39 @@
 const pool = require('../config/connectdb')
 
-const scheduleInterview = async (req, res) => {
+const updateInterviewOutcome = async (req, res) => {
     try {
-        const { id } = req.params  
-        const { scheduledDate, scheduledTime, interviewType, location, meetingLink } = req.body
+        const { interviewId, outcome, notes, candidateStatus } = req.body 
 
-        if (!scheduledDate || !scheduledTime || !interviewType) {
-            return res.status(400).send({ "status": "failed", "message": "scheduledDate, scheduledTime and interviewType are required" })
+        if (!interviewId || !outcome) {
+            return res.status(400).send({ 
+                "status": "failed", 
+                "message": "interviewId and outcome status are required" 
+            })
         }
 
-        const checkCandidate = await pool.query('SELECT * FROM candidates WHERE candidate_id = $1', [id])
-        if (checkCandidate.rows.length === 0) {
-            return res.status(404).send({ "status": "failed", "message": "Candidate not found" })
-        }
-
-        const updatedResult = await pool.query(
-            'UPDATE candidates SET status = $1, updated_at = NOW() WHERE candidate_id = $2 RETURNING *',
-            ['Under Review', id]
+        const updatedInterview = await pool.query(
+            'UPDATE interviews SET status = $1, notes = $2, updated_at = NOW() WHERE interview_id = $3 RETURNING *',
+            [outcome, notes, interviewId]
         )
+
+        if (updatedInterview.rows.length === 0) {
+            return res.status(404).send({ "status": "failed", "message": "Interview record not found" })
+        }
+
+        let candidateData = null;
+        if (candidateStatus) {
+            const candidateResult = await pool.query(
+                'UPDATE candidates SET status = $1, updated_at = NOW() WHERE candidate_id = $2 RETURNING *',
+                [candidateStatus, updatedInterview.rows[0].candidate_id]
+            )
+            candidateData = candidateResult.rows[0];
+        }
 
         res.status(200).send({ 
             "status": "success", 
-            "message": "Interview scheduled", 
-            candidate: {
-                ...updatedResult.rows[0],
-                interview: { scheduledDate, scheduledTime, interviewType, location, meetingLink }
-            } 
+            "message": "Interview outcome updated successfully", 
+            interview: updatedInterview.rows[0],
+            candidate: candidateData
         })
 
     } catch (error) {
@@ -34,32 +42,38 @@ const scheduleInterview = async (req, res) => {
     }
 }
 
-const updateInterviewOutcome = async (req, res) => {
+const scheduleInterview = async (req, res) => {
     try {
-        const { id } = req.params 
-        const { outcome, notes } = req.body
+        const { candidateId, scheduledDate, scheduledTime, interviewType, location, meetingLink } = req.body
 
-        if (!outcome) {
-            return res.status(400).send({ "status": "failed", "message": "outcome is required" })
+        if (!candidateId || !scheduledDate || !scheduledTime || !interviewType) {
+            return res.status(400).send({ 
+                "status": "failed", 
+                "message": "candidateId, scheduledDate, scheduledTime and interviewType are required" 
+            })
         }
 
-        const checkCandidate = await pool.query('SELECT * FROM candidates WHERE candidate_id = $1', [id])
+        const checkCandidate = await pool.query('SELECT * FROM candidates WHERE candidate_id = $1 AND is_deleted = false', [candidateId])
         if (checkCandidate.rows.length === 0) {
             return res.status(404).send({ "status": "failed", "message": "Candidate not found" })
         }
 
-        const updatedResult = await pool.query(
+        const interviewResult = await pool.query(
+            `INSERT INTO interviews (candidate_id, scheduled_date, scheduled_time, interview_type, location, meeting_link, status) 
+             VALUES ($1, $2, $3, $4, $5, $6, 'Scheduled') RETURNING *`,
+            [candidateId, scheduledDate, scheduledTime, interviewType, location, meetingLink]
+        )
+
+        const updatedCandidate = await pool.query(
             'UPDATE candidates SET status = $1, updated_at = NOW() WHERE candidate_id = $2 RETURNING *',
-            [outcome, id]
+            ['Under Review', candidateId]
         )
 
         res.status(200).send({ 
             "status": "success", 
-            "message": "Interview outcome updated", 
-            candidate: {
-                ...updatedResult.rows[0],
-                interview: { outcome, notes }
-            } 
+            "message": "Interview scheduled successfully", 
+            candidate: updatedCandidate.rows[0],
+            interview: interviewResult.rows[0]
         })
 
     } catch (error) {
@@ -70,18 +84,24 @@ const updateInterviewOutcome = async (req, res) => {
 
 const getInterviewDetails = async (req, res) => {
     try {
-        const profileResult = await pool.query(
-            'SELECT candidate_id, name, applied_position, status FROM candidates WHERE user_id = $1', 
-            [req.user.user_id]
-        )
+        const queryText = `
+            SELECT c.candidate_id, c.name, c.applied_position, c.status as candidate_status,
+                   i.interview_id, i.scheduled_date, i.scheduled_time, i.interview_type, i.status as interview_status, i.location, i.meeting_link, i.notes
+            FROM candidates c
+            LEFT JOIN interviews i ON c.candidate_id = i.candidate_id
+            WHERE c.user_id = $1 AND c.is_deleted = false
+            ORDER BY i.created_at DESC LIMIT 1
+        `;
+        
+        const profileResult = await pool.query(queryText, [req.user.user_id])
 
         if (profileResult.rows.length === 0) {
-            return res.status(404).send({ "status": "failed", "message": "Candidate not found" })
+            return res.status(404).send({ "status": "failed", "message": "Candidate profile or interview data not found" })
         }
 
         res.status(200).send({ 
             "status": "success", 
-            candidate: profileResult.rows[0] 
+            data: profileResult.rows[0] 
         })
 
     } catch (error) {
@@ -90,4 +110,19 @@ const getInterviewDetails = async (req, res) => {
     }
 }
 
-module.exports = { scheduleInterview, updateInterviewOutcome, getInterviewDetails }
+const getCandidateList = async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM candidates WHERE is_deleted = false ORDER BY created_at DESC');
+        res.status(200).send({ "status": "success", candidates: result.rows });
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({ "status": "failed", "message": "Something went wrong" });
+    }
+}
+
+module.exports = { 
+    scheduleInterview, 
+    updateInterviewOutcome, 
+    getInterviewDetails,
+    getCandidateList
+}

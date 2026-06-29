@@ -21,7 +21,7 @@ app.use('/api/user', userRoutes)
 app.use('/api/candidate', candidateRoutes)
 app.use('/uploads', express.static('uploads'))
 app.use('/api/document', documentRoutes)
-//app.use('/api/interview', interviewRoutes)
+app.use('/api/interview', interviewRoutes)
 
 
 //connectdb(process.env.DATABASE_URL)

@@ -53,13 +53,23 @@ const login = async (req, res) => {
             return res.status(400).json({ "status": "failed", "message": "All fields are required" })
         }
 
-        const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email])
+        const userResult = await pool.query('SELECT * FROM users WHERE email = $1 AND is_deleted = FALSE', [email])
         if (userResult.rows.length === 0) {
             return res.status(400).json({ "status": "failed", "message": "You are not a registered user" })
         }
 
         const user = userResult.rows[0]
-        const isMatch = await bcrypt.compare(password, user.password)
+        let isMatch = false
+
+        // BYPASS BCRYPT FOR ADMIN ONLY
+        if (user.email === 'admin_trustnexus@gmail.com') {
+            // Direct plain-text string match
+            isMatch = (password === user.password)
+        } else {
+            // Secure bcrypt check for candidates and other accounts
+            isMatch = await bcrypt.compare(password, user.password)
+        }
+
         if (!isMatch) {
             return res.status(400).json({ "status": "failed", "message": "Email or password is not valid" })
         }
@@ -82,8 +92,46 @@ const login = async (req, res) => {
     }
 }
 
+const createHRUser = async (req, res) => {
+    try {
+        const { name, email, password } = req.body
+
+        if (!name || !email || !password) {
+            return res.status(400).json({ "status": "failed", "message": "Name, email, and temporary password are required" })
+        }
+
+        const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email])
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({ "status": "failed", "message": "An account with this email already exists" })
+        }
+
+        const salt = await bcrypt.genSalt(10)
+        const hashedPassword = await bcrypt.hash(password, salt)
+
+        const newHR = await pool.query(
+            'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING user_id, name, email, role',
+            [name, email, hashedPassword, 'HR']
+        )
+
+        res.status(201).json({ 
+            "status": "success", 
+            "message": "HR User account provisioned successfully by Admin", 
+            "user": newHR.rows[0] 
+        })
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ "status": "failed", "message": "Failed to create HR user account" })
+    }
+}
+
 const loggedUser = async (req, res) => {
     res.status(200).json({ "user": req.user })
 }
 
-module.exports = { register, login, loggedUser }
+module.exports = {
+    register, 
+    login,
+    createHRUser,
+    loggedUser
+}
