@@ -6,8 +6,9 @@ const { validateEmailMiddleware } = require('../middlewares/validationMidlleware
 const router = express.Router()
 
 router.post('/register', register)
-.post('/login',validateEmailMiddleware, login)
-.get('/loggedUser', authMiddleware, loggedUser)
-.post('/createHRUser',authMiddleware, adminMiddleware, createHRUser)
+    .post('/login', validateEmailMiddleware, login)
+    .post('/logout', (req, res) => res.status(200).json({ success: true, message: 'Logged out' }))
+    .get('/profile', authMiddleware, loggedUser)
+    .post('/createHRUser', authMiddleware, adminMiddleware, createHRUser)
 
 module.exports = router

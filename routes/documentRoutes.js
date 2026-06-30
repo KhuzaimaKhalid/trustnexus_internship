@@ -5,7 +5,7 @@ const upload = require('../config/multerConfig')
 const { uploadDocuments, getMyDocuments } = require('../controllers/documentController')
 
 router.post(
-    '/upload',
+    '/',
     authMiddleware,
     upload.fields([
         { name: 'cv', maxCount: 1 },

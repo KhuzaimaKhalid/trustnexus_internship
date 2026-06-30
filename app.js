@@ -2,7 +2,7 @@ const express = require('express')
 const app = express()
 const cors = require('cors')
 require('dotenv').config()
-const connectdb = require('./config/connectdb')
+const pool = require('./config/connectdb')
 const userRoutes = require('../TN_HRMS/routes/userRoutes')
 const candidateRoutes = require('./routes/candidateRoutes')
 const documentRoutes = require('./routes/documentRoutes')
@@ -12,7 +12,10 @@ const interviewRoutes = require('./routes/interviewRoutes')
 
 
 
-app.use(cors())
+app.use(cors({
+    origin: 'https://tn-hrns.vercel.app',
+    credentials: true
+}));
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
