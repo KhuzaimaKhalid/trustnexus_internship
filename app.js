@@ -7,6 +7,7 @@ const userRoutes = require('./routes/userRoutes')
 const candidateRoutes = require('./routes/candidateRoutes')
 const documentRoutes = require('./routes/documentRoutes')
 const interviewRoutes = require('./routes/interviewRoutes')
+const projectRoutes = require('./routes/projectRoutes');
 
 
 
@@ -20,12 +21,12 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Routes
-app.use('/api/user', userRoutes)
+app.use('/api/auth', userRoutes)
 app.use('/api/candidate', candidateRoutes)
 app.use('/uploads', express.static('uploads'))
 app.use('/api/document', documentRoutes)
 app.use('/api/interview', interviewRoutes)
-
+app.use('/api/projects', projectRoutes);
 
 //connectdb(process.env.DATABASE_URL)
 
