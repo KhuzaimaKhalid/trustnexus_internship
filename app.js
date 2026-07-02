@@ -13,10 +13,30 @@ const projectRoutes = require('./routes/projectRoutes');
 
 
 
-app.use(cors({
-    origin: 'https://tn-hrns.vercel.app',
-    credentials: true
-}));
+// app.use(cors({
+//     origin: 'https://tn-hrns.vercel.app',
+//     credentials: true
+// }));
+
+app.use((req, res, next) => {
+    const allowedOrigins = ['https://tn-hrns.vercel.app', 'http://localhost:3000'];
+    const origin = req.headers.origin;
+    
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+
+    // Handle the browser preflight OPTIONS check immediately
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    next();
+});
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
