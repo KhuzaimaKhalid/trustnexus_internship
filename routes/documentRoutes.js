@@ -8,7 +8,7 @@ router.post(
     '/',
     authMiddleware,
     upload.fields([
-        { name: 'cv', maxCount: 1 },
+        { name: 'resume', maxCount: 1 },
         { name: 'cnicFront', maxCount: 1 },
         { name: 'cnicBack', maxCount: 1 }
     ]),

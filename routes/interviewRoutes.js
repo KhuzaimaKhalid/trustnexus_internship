@@ -4,7 +4,7 @@ const hrMiddleware = require('../middlewares/hrMiddleware')
 const authMiddleware = require('../middlewares/authMiddleware')
 const { scheduleInterview, updateInterviewOutcome, getInterviewDetails, getCandidateList } = require('../controllers/interviewController')
 
-router.post('/schedule', authMiddleware, hrMiddleware, scheduleInterview)
+router.post('/schedule',  hrMiddleware, scheduleInterview)
     .put('/update-outcome', authMiddleware, hrMiddleware, updateInterviewOutcome)
     .get('/candidates', authMiddleware, hrMiddleware, getCandidateList)
     .get('/details', authMiddleware, getInterviewDetails)

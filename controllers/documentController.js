@@ -12,7 +12,7 @@ const uploadDocuments = async (req, res) => {
         }
 
         const candidate_id = candidateResult.rows[0].candidate_id
-        const cv = req.files['cv'] ? req.files['cv'][0].path : null
+        const cv = req.files['resume'] ? req.files['resume'][0].path : null
         const cnicFront = req.files['cnicFront'] ? req.files['cnicFront'][0].path : null
         const cnicBack = req.files['cnicBack'] ? req.files['cnicBack'][0].path : null
 

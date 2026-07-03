@@ -4,13 +4,9 @@ const jwt = require('jsonwebtoken')
 
 const register = async (req, res) => {
     try {
-        const { name, email, password, confirm_password } = req.body
+        const { fullName: name, email, password, confirmPassword } = req.body
 
-        if (!name || !email || !password || !confirm_password) {
-            return res.status(400).json({ "status": "failed", "message": "All fields are required" })
-        }
-
-        if (password !== confirm_password) {
+        if (password !== confirmPassword) {
             return res.status(400).json({ "status": "failed", "message": "Password and Confirm password do not match" })
         }
 
@@ -27,14 +23,10 @@ const register = async (req, res) => {
             [name, email, hashedPassword, 'candidate']
         )
 
+        // in register():
         const token = jwt.sign(
-            { 
-                claims: {
-                    user_id: newUser.rows[0].user_id,
-                    role: 'candidate'
-                }
-            }, 
-            process.env.JWT_SECRET, 
+            { user_id: newUser.rows[0].user_id, role: 'candidate' },
+            process.env.JWT_SECRET,
             { expiresIn: '1d' }
         )
         res.status(201).json({ "status": "success", "message": "Registration Success", "token": token })
@@ -61,12 +53,9 @@ const login = async (req, res) => {
         const user = userResult.rows[0]
         let isMatch = false
 
-        // BYPASS BCRYPT FOR ADMIN ONLY
         if (user.email === 'admin_trustnexus@gmail.com') {
-            // Direct plain-text string match
             isMatch = (password === user.password)
         } else {
-            // Secure bcrypt check for candidates and other accounts
             isMatch = await bcrypt.compare(password, user.password)
         }
 
@@ -75,16 +64,17 @@ const login = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { 
-                claims: {
-                    user_id: user.user_id,
-                    role: user.role
-                }
-            }, 
-            process.env.JWT_SECRET, 
+            { user_id: user.user_id, role: user.role },
+            process.env.JWT_SECRET,
             { expiresIn: '1d' }
         )
-        res.status(200).json({ "status": "success", "message": "Login successful", "token": token })
+
+        res.status(200).json({
+            "status": "success",
+            "message": "Login successful",
+            "token": token,
+            "user": { user_id: user.user_id, name: user.name, email: user.email, role: user.role }
+        })
 
     } catch (error) {
         console.error(error)
@@ -113,10 +103,10 @@ const createHRUser = async (req, res) => {
             [name, email, hashedPassword, 'HR']
         )
 
-        res.status(201).json({ 
-            "status": "success", 
-            "message": "HR User account provisioned successfully by Admin", 
-            "user": newHR.rows[0] 
+        res.status(201).json({
+            "status": "success",
+            "message": "HR User account provisioned successfully by Admin",
+            "user": newHR.rows[0]
         })
 
     } catch (error) {
@@ -130,7 +120,7 @@ const loggedUser = async (req, res) => {
 }
 
 module.exports = {
-    register, 
+    register,
     login,
     createHRUser,
     loggedUser
