@@ -1,3 +1,4 @@
+const { put } = require('@vercel/blob')
 const pool = require('../config/connectdb')
 
 const uploadDocuments = async (req, res) => {
@@ -12,11 +13,8 @@ const uploadDocuments = async (req, res) => {
         }
 
         const candidate_id = candidateResult.rows[0].candidate_id
-        const cv = req.files['resume'] ? req.files['resume'][0].path : null
-        const cnicFront = req.files['cnicFront'] ? req.files['cnicFront'][0].path : null
-        const cnicBack = req.files['cnicBack'] ? req.files['cnicBack'][0].path : null
 
-        if (!cv || !cnicFront || !cnicBack) {
+        if (!req.files['resume'] || !req.files['cnicFront'] || !req.files['cnicBack']) {
             return res.status(400).send({ "status": "failed", "message": "CV, CNIC front and CNIC back are all required" })
         }
 
@@ -25,10 +23,18 @@ const uploadDocuments = async (req, res) => {
             return res.status(400).send({ "status": "failed", "message": "Documents already uploaded" })
         }
 
+        const resumeFile = req.files['resume'][0]
+        const cnicFrontFile = req.files['cnicFront'][0]
+        const cnicBackFile = req.files['cnicBack'][0]
+
+        const cvBlob = await put(`resumes/${candidate_id}-${Date.now()}-${resumeFile.originalname}`, resumeFile.buffer, { access: 'public' })
+        const cnicFrontBlob = await put(`cnic/${candidate_id}-${Date.now()}-${cnicFrontFile.originalname}`, cnicFrontFile.buffer, { access: 'public' })
+        const cnicBackBlob = await put(`cnic/${candidate_id}-${Date.now()}-${cnicBackFile.originalname}`, cnicBackFile.buffer, { access: 'public' })
+
         const newDoc = await pool.query(
             `INSERT INTO documents (candidate_id, cv_path, cnic_front_path, cnic_back_path) 
              VALUES ($1, $2, $3, $4) RETURNING *`,
-            [candidate_id, cv, cnicFront, cnicBack]
+            [candidate_id, cvBlob.url, cnicFrontBlob.url, cnicBackBlob.url]
         )
 
         res.status(201).send({ "status": "success", "message": "Documents uploaded successfully", document: newDoc.rows[0] })
