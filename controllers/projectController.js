@@ -123,8 +123,106 @@ const getProjectById = async (req, res) => {
     }
 };
 
+// 1. UPDATE PROJECT DETAILS
+const updateProject = async (req, res) => {
+    const { id } = req.params; // Get project_id from URL
+    const { title, description, start_date, end_date, status } = req.body;
+
+    try {
+        const query = `
+            UPDATE projects 
+            SET title = COALESCE($1, title), 
+                description = COALESCE($2, description), 
+                start_date = COALESCE($3, start_date), 
+                end_date = COALESCE($4, end_date), 
+                status = COALESCE($5, status)
+            WHERE project_id = $6 AND is_deleted = false
+            RETURNING *;
+        `;
+        const result = await pool.query(query, [title, description, start_date, end_date, status, id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Project not found or already deleted.' });
+        }
+
+        res.status(200).json({ success: true, message: 'Project updated successfully', data: result.rows[0] });
+    } catch (error) {
+        console.error('Error updating project:', error);
+        res.status(500).json({ success: false, message: 'Server error while updating project.' });
+    }
+};
+
+// 2. DELETE PROJECT (SOFT DELETE)
+const deleteProject = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Instead of deleting the row, we toggle an 'is_deleted' flag to true
+        const query = `
+            UPDATE projects 
+            SET is_deleted = true 
+            WHERE project_id = $1 AND is_deleted = false
+            RETURNING project_id;
+        `;
+        const result = await pool.query(query, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Project not found or already deleted.' });
+        }
+
+        res.status(200).json({ success: true, message: 'Project soft-deleted successfully.' });
+    } catch (error) {
+        console.error('Error soft-deleting project:', error);
+        res.status(500).json({ success: false, message: 'Server error while deleting project.' });
+    }
+};
+
+// 3. ASSIGN USER ROLES TO AN EXISTING PROJECT
+const assignProjectRole = async (req, res) => {
+    const { id } = req.params; // project_id
+    const { userId, role } = req.body; // role can be: 'Project Manager', 'Team Lead', or 'Intern'
+
+    if (!userId || !role) {
+        return res.status(400).json({ success: false, message: 'userId and role are required.' });
+    }
+
+    try {
+        // If assigning a Project Manager, update the main projects table
+        if (role === 'Project Manager') {
+            const pmQuery = `
+                UPDATE projects SET pm_id = $1 WHERE project_id = $2 AND is_deleted = false RETURNING *;
+            `;
+            const pmResult = await pool.query(pmQuery, [userId, id]);
+            if (pmResult.rows.length === 0) return res.status(404).json({ success: false, message: 'Project not found.' });
+            
+            return res.status(200).json({ success: true, message: 'Project Manager assigned successfully.' });
+        } 
+        
+        // If assigning a Team Lead or Intern, insert/update into project_members table
+        if (role === 'Team Lead' || role === 'Intern') {
+            const memberQuery = `
+                INSERT INTO project_members (project_id, user_id, role_in_project)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (project_id, user_id) 
+                DO UPDATE SET role_in_project = EXCLUDED.role_in_project;
+            `;
+            await pool.query(memberQuery, [id, userId, role]);
+            return res.status(200).json({ success: true, message: `${role} assigned successfully.` });
+        }
+
+        return res.status(400).json({ success: false, message: 'Invalid role specified.' });
+
+    } catch (error) {
+        console.error('Error assigning role:', error);
+        res.status(500).json({ success: false, message: 'Server error while assigning role.' });
+    }
+};
+
 module.exports = {
     createProject,
     getAllProjects,
-    getProjectById
+    getProjectById,
+    updateProject,
+    deleteProject,
+    assignProjectRole
 }

@@ -8,7 +8,7 @@ const candidateRoutes = require('./routes/candidateRoutes')
 const documentRoutes = require('./routes/documentRoutes')
 const interviewRoutes = require('./routes/interviewRoutes')
 const projectRoutes = require('./routes/projectRoutes');
-
+const taskRoutes = require('./routes/taskRoutes');
 
 
 
@@ -47,6 +47,7 @@ app.use('/uploads', express.static('uploads'))
 app.use('/api/document', documentRoutes)
 app.use('/api/interview', interviewRoutes)
 app.use('/api/projects', projectRoutes);
+app.use('/api/tasks', taskRoutes);
 
 //connectdb(process.env.DATABASE_URL)
 
