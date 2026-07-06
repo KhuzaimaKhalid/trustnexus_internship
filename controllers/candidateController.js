@@ -122,8 +122,21 @@ const getDashboard = async (req, res) => {
             `SELECT candidate_id, name FROM candidates WHERE user_id = $1 AND is_deleted = FALSE`,
             [userId]
         );
+
+        // No candidate profile yet (e.g. user just registered and hasn't
+        // applied to a position yet). Return a graceful empty dashboard
+        // instead of a 404 so the frontend doesn't break.
         if (candidateRes.rows.length === 0) {
-            return res.status(404).json({ status: "failed", message: "Candidate profile not found" });
+            return res.status(200).json({
+                status: "success",
+                data: {
+                    name: req.user.name,
+                    stats: { total: 0, inProgress: 0, selected: 0, rejected: 0 },
+                    status: null,
+                    interview: null,
+                    notifications: []
+                }
+            });
         }
         const { candidate_id, name } = candidateRes.rows[0];
 
