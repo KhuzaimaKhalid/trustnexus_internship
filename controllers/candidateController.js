@@ -2,7 +2,7 @@ const pool = require('../config/connectdb')
 
 const createCandidate = async (req, res) => {
     try {
-        const { password, applied_position } = req.body;
+        const { applied_position } = req.body;
 
         if (!applied_position) {
             return res.status(400).send({ "status": "failed", "message": "applied_position is required" });
@@ -13,10 +13,18 @@ const createCandidate = async (req, res) => {
             return res.status(400).send({ "status": "failed", "message": "Candidate profile already exists" });
         }
 
+        // The frontend's Apply flow does not (and should not) send a raw
+        // password. Reuse the already-hashed password from the users table
+        // instead of depending on req.body.password, which was coming
+        // through as undefined -> NULL and violating the NOT NULL
+        // constraint on candidates.password.
+        const userRow = await pool.query('SELECT password FROM users WHERE user_id = $1', [req.user.user_id]);
+        const hashedPassword = userRow.rows[0]?.password;
+
         const candidateResult = await pool.query(
             `INSERT INTO candidates (name, email, password, role, status, user_id, applied_position)
              VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-            [req.user.name, req.user.email, password, 'candidate', 'Active', req.user.user_id, applied_position]
+            [req.user.name, req.user.email, hashedPassword, 'candidate', 'Active', req.user.user_id, applied_position]
         );
 
         res.status(201).send({ "status": "success", "message": "Profile created successfully", candidate: candidateResult.rows[0] });
