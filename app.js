@@ -9,8 +9,7 @@ const documentRoutes = require('./routes/documentRoutes')
 const interviewRoutes = require('./routes/interviewRoutes')
 const projectRoutes = require('./routes/projectRoutes');
 const taskRoutes = require('./routes/taskRoutes');
-
-
+const hrRoutes = require('./routes/hrRoutes');
 
 
 // app.use(cors({
@@ -48,6 +47,7 @@ app.use('/api/document', documentRoutes)
 app.use('/api/interview', interviewRoutes)
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/hr', hrRoutes);
 
 //connectdb(process.env.DATABASE_URL)
 
