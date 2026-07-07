@@ -18,7 +18,7 @@ const allowHROnly = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
         // 3. Extract user_id from the nested claims object
-        const userId = decoded.claims && decoded.claims.user_id;
+        const userId = (decoded.claims && decoded.claims.user_id) || (req.user && req.user.user_id);
 
         if (!userId) {
             return res.status(401).send({ 
