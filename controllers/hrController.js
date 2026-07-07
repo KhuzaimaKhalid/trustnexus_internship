@@ -29,14 +29,62 @@ const getHRDashboardMetrics = async (req, res) => {
         `;
         const weeklyInterviewsResult = await pool.query(weeklyInterviewsQuery);
 
-        // Send formatted dataset directly matching your layout components
+        // 5. Dynamic Recruitment Pipeline Breakdown
+        // Aggregates real application statuses from your enum/status column
+        const pipelineStagesQuery = `
+            SELECT status, COUNT(*) as count 
+            FROM applications 
+            WHERE is_deleted = false 
+            GROUP BY status
+        `;
+        const pipelineStagesResult = await pool.query(pipelineStagesQuery);
+        
+        // Map database statuses into a clean key-value lookup
+        const pipelineMap = {};
+        pipelineStagesResult.rows.forEach(row => {
+            pipelineMap[row.status] = parseInt(row.count || 0);
+        });
+
+        // 6. Dynamic Open Positions Count (Distinct roles currently being applied for)
+        const openPositionsQuery = `SELECT COUNT(DISTINCT applied_position) FROM applications WHERE is_deleted = false`;
+        const openPositionsResult = await pool.query(openPositionsQuery);
+
+        // 7. Dynamic Recent Activities (Combining recent applications and document uploads)
+        const dynamicActivitiesQuery = `
+            (
+                SELECT 
+                    'app_' || a.application_id AS id,
+                    'New Application Received' AS title,
+                    c.name || ' applied for ' || a.applied_position AS description,
+                    a.created_at
+                FROM applications a
+                JOIN candidates c ON a.candidate_id = c.candidate_id
+                WHERE a.is_deleted = false
+            )
+            UNION ALL
+            (
+                SELECT 
+                    'doc_' || d.document_id AS id,
+                    'Onboarding Document Submitted' AS title,
+                    c.name || ' uploaded required files' AS description,
+                    d.created_at
+                FROM documents d
+                JOIN candidates c ON d.candidate_id = c.candidate_id
+                WHERE d.is_deleted = false
+            )
+            ORDER BY created_at DESC
+            LIMIT 5
+        `;
+        const dynamicActivitiesResult = await pool.query(dynamicActivitiesQuery);
+
+        // Send fully accurate dataset matching your available Postgres tables
         res.status(200).json({
             success: true,
             data: {
                 stats: {
-                    openPositions: 7, // Placeholder value
+                    openPositions: parseInt(openPositionsResult.rows[0].count || 0),
                     pipelineTotal: parseInt(totalCandidatesResult.rows[0].count || 0),
-                    pendingLeaves: 2, // Placeholder value until leave_management table is introduced
+                    pendingLeaves: 0, // 0 leaves because the table layout does not exist yet
                     interviewsThisWeek: parseInt(weeklyInterviewsResult.rows[0].count || 0),
                     activeProjects: parseInt(activeProjectsResult.rows[0].count || 0)
                 },
@@ -45,6 +93,20 @@ const getHRDashboardMetrics = async (req, res) => {
                     role: row.applied_position,
                     time: row.scheduled_time,
                     interview_id: row.interview_id
+                })),
+                pipelineBreakdown: {
+                    applied: pipelineMap['Submitted'] || 0,
+                    taskSubmitted: pipelineMap['Task Submitted'] || 0,
+                    interviewScheduled: pipelineMap['Interview Scheduled'] || 0,
+                    interviewed: pipelineMap['Interviewed'] || 0,
+                    selected: pipelineMap['Selected'] || 0,
+                    onboarded: pipelineMap['Onboarded'] || 0
+                },
+                pendingLeaveList: [], // Clean empty array; avoids crashing frontend with fake values
+                recentActivities: dynamicActivitiesResult.rows.map(row => ({
+                    id: row.id,
+                    title: row.title,
+                    desc: row.description
                 }))
             }
         });
