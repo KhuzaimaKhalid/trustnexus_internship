@@ -284,11 +284,30 @@ const getStatusByEmail = async (req, res) => {
     }
 };
 
+// Add this to controllers/candidateController.js
+const getAllCandidatesForHR = async (req, res) => {
+    try {
+        // Query to fetch all active applications with candidate names
+        const result = await pool.query(
+            `SELECT c.user_id, c.name, a.applied_position AS position, a.status, a.created_at
+             FROM applications a
+             JOIN candidates c ON a.candidate_id = c.candidate_id
+             WHERE a.is_deleted = FALSE AND c.is_deleted = FALSE
+             ORDER BY a.created_at DESC`
+        );
+
+        res.status(200).json({ status: "success", data: result.rows });
+    } catch (error) {
+        console.error("Error fetching HR candidates:", error);
+        res.status(500).json({ status: "failed", message: "Something went wrong" });
+    }
+};
 module.exports = {
     createCandidate,
     submitApplication,
     getApplicationStatus,
     getCandidateProfile,
     getDashboard,
-    getStatusByEmail
+    getStatusByEmail,
+    getAllCandidatesForHR
 }
