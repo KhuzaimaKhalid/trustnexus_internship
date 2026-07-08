@@ -10,6 +10,9 @@ const interviewRoutes = require('./routes/interviewRoutes')
 const projectRoutes = require('./routes/projectRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const hrRoutes = require('./routes/hrRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const leaveRoutes = require('./routes/leaveRoutes');
+
 
 
 // app.use(cors({
@@ -48,6 +51,8 @@ app.use('/api/interview', interviewRoutes)
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/hr', hrRoutes);
+app.use('/api/messages', messageRoutes)
+app.use('/api/leaves', leaveRoutes)
 
 //connectdb(process.env.DATABASE_URL)
 

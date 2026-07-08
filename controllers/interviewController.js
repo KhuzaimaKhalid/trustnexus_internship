@@ -120,9 +120,37 @@ const getCandidateList = async (req, res) => {
     }
 }
 
+const getUpcomingInterviews = async (req, res) => {
+    try {
+        const queryText = `
+            SELECT i.interview_id, i.scheduled_date, i.scheduled_time, i.interview_type,
+                   i.status as interview_status, i.location, i.meeting_link,
+                   c.candidate_id, c.name, c.applied_position
+            FROM interviews i
+            JOIN candidates c ON c.candidate_id = i.candidate_id
+            WHERE c.is_deleted = false
+              AND i.scheduled_date >= CURRENT_DATE
+              AND i.status = 'Scheduled'
+            ORDER BY i.scheduled_date ASC, i.scheduled_time ASC
+        `;
+ 
+        const result = await pool.query(queryText);
+ 
+        res.status(200).send({
+            "status": "success",
+            "interviews": result.rows
+        })
+ 
+    } catch (error) {
+        console.log(error)
+        res.status(500).send({ "status": "failed", "message": "Something went wrong" })
+    }
+}
+
 module.exports = { 
     scheduleInterview, 
     updateInterviewOutcome, 
     getInterviewDetails,
-    getCandidateList
+    getCandidateList,
+    getUpcomingInterviews
 }
