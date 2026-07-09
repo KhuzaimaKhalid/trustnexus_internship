@@ -1,25 +1,52 @@
 const pool = require('../config/connectdb');
+const path = require('path');
+const fs = require('fs');
 
 const createTask = async (req, res) => {
-    const { project_id, title, description, assigned_to, due_date } = req.body;
+    const {
+        project_id, project_name, title, description,
+        assigned_to, assignee_name, reporter, priority,
+        start_date, due_date, team, status,
+    } = req.body;
 
-    if (!project_id || !title) {
-        return res.status(400).json({ success: false, message: 'Project ID and Title are required.' });
+    if (!title) {
+        return res.status(400).json({ success: false, message: 'Title is required.' });
     }
 
     try {
+        let attachmentPath = null;
+        if (req.file) {
+            const uploadsDir = path.join(__dirname, '..', 'uploads', 'tasks');
+            fs.mkdirSync(uploadsDir, { recursive: true });
+            const fileName = `${Date.now()}-${req.file.originalname}`;
+            fs.writeFileSync(path.join(uploadsDir, fileName), req.file.buffer);
+            attachmentPath = `/uploads/tasks/${fileName}`;
+        }
+
         const query = `
-            INSERT INTO tasks (project_id, title, description, assigned_to, due_date)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO tasks (
+                project_id, project_name, title, description,
+                assigned_to, assignee_name, reporter, priority,
+                start_date, due_date, team, attachment_path, status
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
             RETURNING *;
         `;
-        const result = await pool.query(query, [project_id, title, description, assigned_to, due_date]);
+        const values = [
+            project_id || null, project_name || null, title, description || null,
+            assigned_to || null, assignee_name || null, reporter || null,
+            priority || 'Medium', start_date || null, due_date || null,
+            team || null, attachmentPath, status || 'Todo',
+        ];
+
+        const result = await pool.query(query, values);
         res.status(201).json({ success: true, message: 'Task created successfully', data: result.rows[0] });
     } catch (error) {
         console.error('Error creating task:', error);
         res.status(500).json({ success: false, message: 'Server error while creating task.' });
     }
 };
+
 
 const getTasks = async (req, res) => {
     const { project_id } = req.query; 
