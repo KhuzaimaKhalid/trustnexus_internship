@@ -284,24 +284,58 @@ const getStatusByEmail = async (req, res) => {
     }
 };
 
-// Add this to controllers/candidateController.js
 const getAllCandidatesForHR = async (req, res) => {
     try {
-        // Query to fetch all active applications with candidate names
+        const sortBy = req.query.sort || 'created_at'; 
+
         const result = await pool.query(
             `SELECT c.user_id, c.name, a.applied_position AS position, a.status, a.created_at
              FROM applications a
              JOIN candidates c ON a.candidate_id = c.candidate_id
-             WHERE a.is_deleted = FALSE AND c.is_deleted = FALSE
-             ORDER BY a.created_at DESC`
+             WHERE a.is_deleted = FALSE AND c.is_deleted = FALSE`
         );
 
-        res.status(200).json({ status: "success", data: result.rows });
+        const sortedCandidates = mergeSort(result.rows, sortBy);
+
+        res.status(200).json({ status: "success", data: sortedCandidates });
     } catch (error) {
         console.error("Error fetching HR candidates:", error);
         res.status(500).json({ status: "failed", message: "Something went wrong" });
     }
 };
+
+function merge(left, right, sortBy) {
+    let result = [];
+    let leftIndex = 0;
+    let rightIndex = 0;
+
+    while (leftIndex < left.length && rightIndex < right.length) {
+        if (left[leftIndex][sortBy] <= right[rightIndex][sortBy]) {
+            result.push(left[leftIndex]);
+            leftIndex++;
+        } else {
+            result.push(right[rightIndex]);
+            rightIndex++;
+        }
+    }
+
+    return result.concat(left.slice(leftIndex)).concat(right.slice(rightIndex));
+}
+
+function mergeSort(array, sortBy) {
+    if (array.length <= 1) return array;
+
+    const middle = Math.floor(array.length / 2);
+    const left = array.slice(0, middle);
+    const right = array.slice(middle);
+
+    return merge(
+        mergeSort(left, sortBy),
+        mergeSort(right, sortBy),
+        sortBy
+    );
+}
+
 module.exports = {
     createCandidate,
     submitApplication,
