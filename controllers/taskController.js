@@ -1,6 +1,5 @@
 const pool = require('../config/connectdb');
-const path = require('path');
-const fs = require('fs');
+const { put } = require('@vercel/blob');
 
 const createTask = async (req, res) => {
     const {
@@ -16,11 +15,13 @@ const createTask = async (req, res) => {
     try {
         let attachmentPath = null;
         if (req.file) {
-            const uploadsDir = path.join(__dirname, '..', 'uploads', 'tasks');
-            fs.mkdirSync(uploadsDir, { recursive: true });
-            const fileName = `${Date.now()}-${req.file.originalname}`;
-            fs.writeFileSync(path.join(uploadsDir, fileName), req.file.buffer);
-            attachmentPath = `/uploads/tasks/${fileName}`;
+            const fileName = `tasks/${Date.now()}-${req.file.originalname}`;
+            const blob = await put(fileName, req.file.buffer, {
+                access: 'public',
+                token: process.env.BLOB_READ_WRITE_TOKEN,
+                contentType: req.file.mimetype,
+            });
+            attachmentPath = blob.url;
         }
 
         const query = `
