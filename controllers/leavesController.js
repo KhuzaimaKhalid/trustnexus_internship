@@ -103,7 +103,7 @@ const getAllLeavesForHR = async (req, res) => {
             SELECT l.leave_id, l.leave_type, l.days, l.status, l.start_date, l.end_date, u.name
             FROM leaves l
             JOIN users u ON l.user_id = u.user_id
-            WHERE l.is_deleted = FALSE AND l.status = 'Pending';
+            WHERE l.is_deleted = FALSE;
         `;
         
         const result = await pool.query(query);
