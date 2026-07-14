@@ -290,23 +290,19 @@ const getAllCandidatesForHR = async (req, res) => {
     try {
         const sortBy = req.query.sort || 'created_at'; 
 
-        // Query modified to fetch email, phone, skills, resume, experience, and education
         const result = await pool.query(
             `SELECT 
                 c.candidate_id,
                 c.user_id, 
                 c.name, 
-                c.email,
-                c.phone,
-                c.skills,
-                c.resume_url,
-                c.experience,
-                c.education,
+                u.email, -- Email from users table
+                c.phone, -- Now safely queried!
                 a.applied_position, 
                 a.status, 
                 a.created_at
              FROM applications a
              JOIN candidates c ON a.candidate_id = c.candidate_id
+             JOIN users u ON c.user_id = u.user_id
              WHERE a.is_deleted = FALSE AND c.is_deleted = FALSE`
         );
 
