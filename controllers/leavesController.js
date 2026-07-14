@@ -10,12 +10,12 @@ class LeavePriorityQueue {
         let score = 0;
         const type = leave.leave_type || '';
         // Weight based on leave type
-        if (leave.leave_type === 'Sick' || leave.leave_type === 'Medical') {
+        if (type.includes('Sick') || type.includes('Medical')) {
             score += 100;
-        } else if (leave.leave_type === 'Casual') {
+        } else if (type.includes('Casual')) {
             score += 50;
         } else {
-            score += 20; // Default or short notice leaves
+            score += 20; // Default (e.g., Annual Leave)
         }
 
         // Long absences take higher priority for HR review
