@@ -4,7 +4,8 @@ const jwt = require('jsonwebtoken')
 
 const register = async (req, res) => {
     try {
-        const { fullName: name, email, password, confirmPassword } = req.body
+        // 1. Destructure applied_position from the request body as well
+        const { fullName: name, email, password, confirmPassword, appliedPosition } = req.body
 
         if (password !== confirmPassword) {
             return res.status(400).json({ "status": "failed", "message": "Password and Confirm password do not match" })
@@ -18,18 +19,31 @@ const register = async (req, res) => {
         const salt = await bcrypt.genSalt(10)
         const hashedPassword = await bcrypt.hash(password, salt)
 
+        // 2. Insert into users table
         const newUser = await pool.query(
             'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING user_id',
             [name, email, hashedPassword, 'candidate']
         )
 
-        // in register():
+        const newUserId = newUser.rows[0].user_id
+
+        // 3. Automatically create the candidate profile record
+        // Use a default position (like 'Backend Developer' or 'Candidate') if appliedPosition is not sent in req.body
+        const position = appliedPosition || 'Backend Developer' 
+
+        await pool.query(
+            `INSERT INTO candidates (name, email, password, role, status, user_id, applied_position)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [name, email, hashedPassword, 'candidate', 'Active', newUserId, position]
+        )
+
+        // 4. Generate token and return success
         const token = jwt.sign(
-            { user_id: newUser.rows[0].user_id, role: 'candidate' },
+            { user_id: newUserId, role: 'candidate' },
             process.env.JWT_SECRET,
             { expiresIn: '1d' }
         )
-        res.status(201).json({ "status": "success", "message": "Registration Success", "token": token })
+        res.status(201).json({ "status": "success", "message": "Registration & Profile Creation Success", "token": token })
 
     } catch (error) {
         console.error(error)
