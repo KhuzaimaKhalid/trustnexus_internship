@@ -135,7 +135,8 @@ const updateLeaveStatus = async (req, res) => {
         const { id } = req.params;
         const { status } = req.body;
 
-        if (!['Approved', 'Rejected'].includes(status)) {
+        // Allow 'Forwarded' as a valid status transition
+        if (!['Approved', 'Rejected', 'Forwarded'].includes(status)) {
             return res.status(400).json({ success: false, message: "Invalid status update" });
         }
 
@@ -151,7 +152,7 @@ const updateLeaveStatus = async (req, res) => {
             return res.status(404).json({ success: false, message: "Leave request not found" });
         }
 
-        res.status(200).json({ success: true, message: `Leave application ${status} successfully.` });
+        res.status(200).json({ success: true, message: `Leave status updated to ${status} successfully.` });
     } catch (error) {
         console.error("Error updating leave status:", error);
         res.status(500).json({ success: false, message: "Something went wrong" });
