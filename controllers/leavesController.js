@@ -8,7 +8,7 @@ class LeavePriorityQueue {
     // Helper to calculate custom business urgency weights dynamically
     _calculateWeight(leave) {
         let score = 0;
-        
+        const type = leave.leave_type || '';
         // Weight based on leave type
         if (leave.leave_type === 'Sick' || leave.leave_type === 'Medical') {
             score += 100;
