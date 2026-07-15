@@ -151,9 +151,10 @@ const getDashboard = async (req, res) => {
         // 2) All applications for this candidate
         const appsRes = await pool.query(
             `SELECT status, applied_position, created_at 
-         FROM applications 
-         WHERE candidate_id = $1 AND is_deleted = FALSE`,
-            [candidate_id]
+     FROM applications 
+     WHERE candidate_id = $1 
+       AND (is_deleted = FALSE OR is_deleted IS NULL)`,
+    [candidate_id]
         );
         const apps = appsRes.rows;
 
