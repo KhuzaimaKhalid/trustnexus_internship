@@ -48,7 +48,66 @@ const createTask = async (req, res) => {
     }
 };
 
+const submitCandidateTask = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const { repository_link, comments } = req.body;
 
+        // 1. Get candidate_id and current application
+        const candidateRes = await pool.query(
+            'SELECT candidate_id FROM candidates WHERE user_id = $1 AND is_deleted = FALSE',
+            [userId]
+        );
+
+        if (candidateRes.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "Candidate profile not found." });
+        }
+        const candidateId = candidateRes.rows[0].candidate_id;
+
+        // 2. Handle file upload (if files are attached)
+        let fileUrl = null;
+        if (req.file) {
+            const fileName = `task-submissions/${candidateId}-${Date.now()}-${req.file.originalname}`;
+            const blob = await put(fileName, req.file.buffer, {
+                access: 'public',
+                token: process.env.BLOB_READ_WRITE_TOKEN,
+                contentType: req.file.mimetype,
+            });
+            fileUrl = blob.url;
+        }
+
+        // 3. Update the candidate's application status to 'Task Submitted'
+        const updateAppQuery = `
+            UPDATE applications 
+            SET status = 'Task Submitted', updated_at = NOW()
+            WHERE candidate_id = $1 AND is_deleted = FALSE
+            RETURNING *;
+        `;
+        const updatedApp = await pool.query(updateAppQuery, [candidateId]);
+
+        if (updatedApp.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "No active application found to attach task to." });
+        }
+
+        // 4. Save the submission details to your database (e.g., tasks or a new task_submissions table)
+        // If you don't have a task_submissions table yet, you can log it or insert it into your documents/tasks structure.
+        // Here, we'll return a success response showing the status has changed.
+        res.status(200).json({
+            success: true,
+            message: "Task assessment submitted successfully!",
+            data: {
+                status: 'Task Submitted',
+                fileUrl,
+                repository_link,
+                comments
+            }
+        });
+
+    } catch (error) {
+        console.error("Task submission error:", error);
+        res.status(500).json({ success: false, message: "Server error during task submission." });
+    }
+};
 const getTasks = async (req, res) => {
     const { project_id } = req.query; 
     try {
@@ -129,5 +188,6 @@ module.exports = {
     createTask,
     getTasks,
     updateTaskStatus,
-    assignTask
+    assignTask,
+    submitCandidateTask
 };
