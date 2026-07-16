@@ -64,6 +64,22 @@ const scheduleInterview = async (req, res) => {
             [candidateId, scheduledDate, scheduledTime, interviewType, location, meetingLink, interviewer]
         )
 
+        // NOTE: the candidate-facing dashboard reads applications.status
+        // (not candidates.status) to decide what to show in the timeline.
+        // Updating candidates.status alone left the dashboard stuck showing
+        // "Task Submitted" even after a real interview was scheduled.
+        const updatedApplication = await pool.query(
+            `UPDATE applications 
+             SET status = 'Interview Scheduled', updated_at = NOW() 
+             WHERE application_id = (
+                 SELECT application_id FROM applications
+                 WHERE candidate_id = $1 AND is_deleted = FALSE
+                 ORDER BY created_at DESC LIMIT 1
+             )
+             RETURNING *`,
+            [candidateId]
+        )
+
         const updatedCandidate = await pool.query(
             'UPDATE candidates SET status = $1, updated_at = NOW() WHERE candidate_id = $2 RETURNING *',
             ['Under Review', candidateId]
@@ -73,6 +89,7 @@ const scheduleInterview = async (req, res) => {
             "status": "success",
             "message": "Interview scheduled successfully",
             candidate: updatedCandidate.rows[0],
+            application: updatedApplication.rows[0],
             interview: interviewResult.rows[0]
         })
 
@@ -123,12 +140,22 @@ const getCandidateList = async (req, res) => {
 
 const getUpcomingInterviews = async (req, res) => {
     try {
+        // NOTE: position comes from the candidate's latest application
+        // (applications.applied_position), not candidates.applied_position,
+        // which is a stale value set once at registration and never updated.
         const queryText = `
             SELECT i.interview_id, i.scheduled_date, i.scheduled_time, i.interview_type,
                    i.status as interview_status, i.location, i.meeting_link, i.interviewer,
-                   c.candidate_id, c.name, c.applied_position
+                   c.candidate_id, c.name, la.applied_position
             FROM interviews i
             JOIN candidates c ON c.candidate_id = i.candidate_id
+            LEFT JOIN LATERAL (
+                SELECT applied_position
+                FROM applications
+                WHERE candidate_id = c.candidate_id AND is_deleted = FALSE
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) la ON true
             WHERE c.is_deleted = false
               AND i.scheduled_date >= CURRENT_DATE
               AND i.status = 'Scheduled'

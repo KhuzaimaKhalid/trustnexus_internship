@@ -7,10 +7,20 @@ const getHRDashboardMetrics = async (req, res) => {
         const totalCandidatesResult = await pool.query(totalCandidatesQuery);
 
         // 2. Interviews scheduled for today
+        // NOTE: position now comes from the candidate's latest application
+        // (applications.applied_position), not candidates.applied_position,
+        // which is a stale value set once at registration and never updated.
         const todaysInterviewsQuery = `
-            SELECT c.name, c.applied_position, i.scheduled_time, i.interview_id
+            SELECT c.name, la.applied_position, i.scheduled_time, i.interview_id
             FROM interviews i
             JOIN candidates c ON i.candidate_id = c.candidate_id
+            LEFT JOIN LATERAL (
+                SELECT applied_position
+                FROM applications
+                WHERE candidate_id = c.candidate_id AND is_deleted = FALSE
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) la ON true
             WHERE i.scheduled_date = CURRENT_DATE 
               AND c.is_deleted = false
             ORDER BY i.scheduled_time ASC

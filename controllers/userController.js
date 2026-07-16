@@ -4,50 +4,42 @@ const jwt = require('jsonwebtoken')
 
 const register = async (req, res) => {
     try {
-        // 1. Destructure applied_position from the request body as well
-        const { fullName: name, email, password, confirmPassword, appliedPosition } = req.body
+        const { fullName: name, email, password, confirmPassword, appliedPosition, role } = req.body
 
         if (password !== confirmPassword) {
-            return res.status(400).json({ "status": "failed", "message": "Password and Confirm password do not match" })
+            return res.status(400).json({ status: "failed", message: "Password and Confirm password do not match" })
         }
 
         const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email])
         if (existingUser.rows.length > 0) {
-            return res.status(400).json({ "status": "failed", "message": "User already exists" })
+            return res.status(400).json({ status: "failed", message: "User already exists" })
         }
 
         const salt = await bcrypt.genSalt(10)
         const hashedPassword = await bcrypt.hash(password, salt)
+        const userRole = role === 'Employee' ? 'Employee' : 'candidate'
 
-        // 2. Insert into users table
         const newUser = await pool.query(
             'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING user_id',
-            [name, email, hashedPassword, 'candidate']
+            [name, email, hashedPassword, userRole]
         )
-
         const newUserId = newUser.rows[0].user_id
 
-        // 3. Automatically create the candidate profile record
-        // Use a default position (like 'Backend Developer' or 'Candidate') if appliedPosition is not sent in req.body
-        const position = appliedPosition || 'Backend Developer' 
+        if (userRole === 'candidate') {
+            const position = appliedPosition || 'Backend Developer'
+            await pool.query(
+                `INSERT INTO candidates (name, email, password, role, status, user_id, applied_position)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [name, email, hashedPassword, 'candidate', 'Active', newUserId, position]
+            )
+        }
 
-        await pool.query(
-            `INSERT INTO candidates (name, email, password, role, status, user_id, applied_position)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [name, email, hashedPassword, 'candidate', 'Active', newUserId, position]
-        )
-
-        // 4. Generate token and return success
-        const token = jwt.sign(
-            { user_id: newUserId, role: 'candidate' },
-            process.env.JWT_SECRET,
-            { expiresIn: '1d' }
-        )
-        res.status(201).json({ "status": "success", "message": "Registration & Profile Creation Success", "token": token })
+        const token = jwt.sign({ user_id: newUserId, role: userRole }, process.env.JWT_SECRET, { expiresIn: '1d' })
+        res.status(201).json({ status: "success", message: "Registration successful", token })
 
     } catch (error) {
         console.error(error)
-        res.status(500).json({ "status": "failed", "message": "Registration failed" })
+        res.status(500).json({ status: "failed", message: "Registration failed" })
     }
 }
 
@@ -67,7 +59,7 @@ const login = async (req, res) => {
         const user = userResult.rows[0]
         let isMatch = false
 
-        if (user.email === 'admin_trustnexus@gmail.com') {
+        if (user.email === 'admin_trustnexus@gmail.com' || user.role === 'CFO' || user.role === 'Team Lead') {
             isMatch = (password === user.password)
         } else {
             isMatch = await bcrypt.compare(password, user.password)
@@ -130,7 +122,7 @@ const createHRUser = async (req, res) => {
 }
 
 const loggedUser = async (req, res) => {
-    res.status(200).json({ "user": req.user })
+    res.status(200).json({ user: req.user })
 }
 
 module.exports = {

@@ -150,7 +150,7 @@ const getDashboard = async (req, res) => {
 
         // 2) All applications for this candidate
         const appsRes = await pool.query(
-            `SELECT status, applied_position, created_at 
+            `SELECT application_id, status, applied_position, created_at 
      FROM applications 
      WHERE candidate_id = $1 
        AND (is_deleted = FALSE OR is_deleted IS NULL)`,
@@ -169,7 +169,7 @@ const getDashboard = async (req, res) => {
 
         // 5) Upcoming interview (not completed)
         const interviewRes = await pool.query(
-            `SELECT scheduled_date, scheduled_time 
+            `SELECT scheduled_date, scheduled_time, interview_type, location, meeting_link, interviewer, notes
          FROM interviews 
          WHERE candidate_id = $1 AND status != 'Completed' 
          ORDER BY scheduled_date ASC, scheduled_time ASC LIMIT 1`,
@@ -201,6 +201,8 @@ const getDashboard = async (req, res) => {
 
         // 6) Build response exactly as frontend expects
         const dashboardData = {
+            candidate_id,
+            application_id: latestApp ? latestApp.application_id : null,
             name,
             stats: { total, inProgress, selected, rejected },
             status: latestApp ? {
@@ -216,6 +218,11 @@ const getDashboard = async (req, res) => {
                 }),
                 day: new Date(interview.scheduled_date).toLocaleDateString('en-GB', { weekday: 'long' }),
                 time: interview.scheduled_time,
+                type: interview.interview_type,
+                location: interview.location,
+                meetLink: interview.meeting_link,
+                interviewer: interview.interviewer,
+                notes: interview.notes,
             } : null,
             notifications,
         };
@@ -348,6 +355,52 @@ function mergeSort(array, sortBy) {
     );
 }
 
+// candidateController.js
+
+const updateApplicationStatusForCandidate = async (req, res) => {
+    try {
+        const { candidateId } = req.params;
+        const { status } = req.body;
+
+        const allowedStatuses = [
+            'Submitted', 'Task Submitted', 'Interview Scheduled',
+            'Interview Cleared', 'Selected', 'Rejected', 'Waiting list'
+        ];
+        if (!status || !allowedStatuses.includes(status)) {
+            return res.status(400).json({ status: "failed", message: "A valid status is required." });
+        }
+
+        // Update the candidate's most recent active application, matching
+        // the same "latest application" pattern used in getDashboard and
+        // scheduleInterview, so no application_id needs to be tracked
+        // separately on the frontend.
+        const result = await pool.query(
+            `UPDATE applications
+             SET status = $1, updated_at = NOW()
+             WHERE application_id = (
+                 SELECT application_id FROM applications
+                 WHERE candidate_id = $2 AND is_deleted = FALSE
+                 ORDER BY created_at DESC LIMIT 1
+             )
+             RETURNING *`,
+            [status, candidateId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ status: "failed", message: "No active application found for this candidate." });
+        }
+
+        res.status(200).json({
+            status: "success",
+            message: `Application status updated to "${status}".`,
+            application: result.rows[0]
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ status: "failed", message: "Something went wrong" });
+    }
+};
+
 module.exports = {
     createCandidate,
     submitApplication,
@@ -355,5 +408,6 @@ module.exports = {
     getCandidateProfile,
     getDashboard,
     getStatusByEmail,
-    getAllCandidatesForHR
+    getAllCandidatesForHR,
+    updateApplicationStatusForCandidate
 }

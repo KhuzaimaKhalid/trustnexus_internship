@@ -1,7 +1,7 @@
 const multer = require('multer')
 const path = require('path')
 
-const storage = multer.memoryStorage()
+const storage = multer.memoryStorage() // 🟢 Perfect for streaming directly to the cloud
 
 const fileFilter = (req, file, cb) => {
     const allowedTypes = /pdf|doc|docx|jpg|jpeg|png/
@@ -25,7 +25,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
     storage,
     fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 }
+    limits: { fileSize: 4.5 * 1024 * 1024 } // ⚠️ Note: Vercel serverless has a 4.5MB request payload limit
 })
 
 module.exports = upload
